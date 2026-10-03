@@ -43,40 +43,48 @@ def preprocess_text(text):
     return " ".join(cleaned_tokens)
 
 def load_and_prepare_data(num_samples=10000):
-    """
-    Loads Quora Question Pairs from local questions.csv.
-    Extracts unique questions to form a corpus and identifies relevant pairs for queries.
-    """
-    # Load from local CSV
-    df = pd.read_csv("questions.csv")
-    
+    import pandas as pd
+    try:
+        df = pd.read_csv("questions.csv")
+        is_local = True
+    except FileNotFoundError:
+        from datasets import load_dataset
+        dataset = load_dataset("quora", split="train")
+        df = dataset.to_pandas()
+        is_local = False
+        
     questions_dict = {}
     qrels = {}
-    
     count = 0
+    
     for _, row in df.iterrows():
         if count >= num_samples:
             break
             
-        try:
-            is_dup = int(row['is_duplicate']) if pd.notna(row['is_duplicate']) else 0
-            q1_id = int(row['qid1'])
-            q1_text = str(row['question1'])
-            q2_id = int(row['qid2'])
-            q2_text = str(row['question2'])
-        except Exception:
-            continue
+        if is_local:
+            try:
+                is_dup = int(row['is_duplicate']) if pd.notna(row['is_duplicate']) else 0
+                q1_id = int(row['qid1'])
+                q1_text = str(row['question1'])
+                q2_id = int(row['qid2'])
+                q2_text = str(row['question2'])
+            except Exception:
+                continue
+        else:
+            is_dup = int(row['is_duplicate'])
+            q_list = row['questions']
+            q1_id = int(q_list['id'][0])
+            q1_text = str(q_list['text'][0])
+            q2_id = int(q_list['id'][1])
+            q2_text = str(q_list['text'][1])
             
-        # Add to corpus
         questions_dict[q1_id] = q1_text
         questions_dict[q2_id] = q2_text
         
-        # Build relevance judgments (qrels)
         if is_dup == 1:
             if q1_id not in qrels:
                 qrels[q1_id] = set()
             qrels[q1_id].add(q2_id)
-            
             if q2_id not in qrels:
                 qrels[q2_id] = set()
             qrels[q2_id].add(q1_id)
