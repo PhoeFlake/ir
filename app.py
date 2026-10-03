@@ -8,37 +8,56 @@ import time
 
 st.set_page_config(layout="wide", page_title="Duplicate Question Retrieval")
 
+# ── Header ────────────────────────────────────────────────────────────────────
 st.title("Duplicate Question Retrieval")
-st.markdown("Information Retrieval Pipeline with TF-IDF, BM25, Sentence Transformers, and Hybrid RRF.")
+st.caption("Information Retrieval Pipeline  ·  TF-IDF  ·  BM25  ·  Sentence Transformers  ·  Hybrid RRF")
+st.divider()
 
-@st.cache_resource
+# ── Load pipeline ─────────────────────────────────────────────────────────────
+@st.cache_resource(show_spinner=False)
 def load_pipeline():
-    with st.spinner("Loading Quora dataset... (Using 10,000 samples for rapid demo)"):
-        corpus_ids, corpus_texts, qrels = utils.load_and_prepare_data(num_samples=10000)
-        
-    with st.spinner("Preprocessing text (Cleaning, Tokenization, Stemming)..."):
-        corpus_processed = [utils.preprocess_text(text) for text in corpus_texts]
-        
-    with st.spinner("Building TF-IDF Index..."):
+    steps = [
+        ("Loading full Quora dataset (404k pairs)…",
+         lambda: utils.load_and_prepare_data()),
+        ("Preprocessing text…",
+         None),
+        ("Building TF-IDF index…",
+         None),
+        ("Building BM25 index…",
+         None),
+        ("Encoding dense embeddings (this takes a while on first run)…",
+         None),
+    ]
+
+    with st.status("Initialising pipeline — please wait…", expanded=True) as status:
+        st.write(steps[0][0])
+        corpus_ids, corpus_texts, qrels = utils.load_and_prepare_data()
+
+        st.write("Preprocessing text…")
+        corpus_processed = [utils.preprocess_text(t) for t in corpus_texts]
+
+        st.write("Building TF-IDF index…")
         tfidf_vec, tfidf_mat = utils.build_tfidf(corpus_processed)
-        
-    with st.spinner("Building BM25 Index..."):
+
+        st.write("Building BM25 index…")
         bm25_model = utils.build_bm25(corpus_processed)
-        
-    with st.spinner("Building Dense Embeddings (SentenceTransformer)..."):
+
+        st.write("Encoding dense embeddings (this takes a while on first run)…")
         dense_model, dense_mat = utils.build_dense(corpus_texts)
-        
-    return {
-        "corpus_ids": corpus_ids,
-        "corpus_texts": corpus_texts,
-        "corpus_processed": corpus_processed,
-        "qrels": qrels,
-        "tfidf_vec": tfidf_vec,
-        "tfidf_mat": tfidf_mat,
-        "bm25_model": bm25_model,
-        "dense_model": dense_model,
-        "dense_mat": dense_mat
-    }
+
+        status.update(label="Pipeline ready!", state="complete", expanded=False)
+
+    return dict(
+        corpus_ids=corpus_ids,
+        corpus_texts=corpus_texts,
+        corpus_processed=corpus_processed,
+        qrels=qrels,
+        tfidf_vec=tfidf_vec,
+        tfidf_mat=tfidf_mat,
+        bm25_model=bm25_model,
+        dense_model=dense_model,
+        dense_mat=dense_mat,
+    )
 
 try:
     pipeline = load_pipeline()
@@ -46,193 +65,184 @@ except Exception as e:
     st.error(f"Error loading pipeline: {e}")
     st.stop()
 
-corpus_ids = pipeline["corpus_ids"]
+corpus_ids   = pipeline["corpus_ids"]
 corpus_texts = pipeline["corpus_texts"]
-id_to_text = {cid: txt for cid, txt in zip(corpus_ids, corpus_texts)}
+id_to_text   = dict(zip(corpus_ids, corpus_texts))
 
-tab1, tab2 = st.tabs(["Search Interface", "Evaluation & Metrics"])
+# ── Tabs ──────────────────────────────────────────────────────────────────────
+tab1, tab2 = st.tabs(["Search", "Evaluation & Metrics"])
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB 1 – SEARCH
+# ═══════════════════════════════════════════════════════════════════════════════
 with tab1:
-    st.subheader("Interactive Search")
-    st.write("Find duplicate questions using 4 different ranking paradigms.")
-    
-    query = st.text_input("Enter a question to find duplicates:", "top marvel movies")
-    
-    if st.button("Search"):
-        start_time = time.time()
-        
-        # Preprocess query
-        processed_query = utils.preprocess_text(query)
-        
-        # 1. TF-IDF
-        query_tfidf = pipeline["tfidf_vec"].transform([processed_query])
-        tfidf_scores_all = cosine_similarity(query_tfidf, pipeline["tfidf_mat"]).flatten()
-        tfidf_sorted_idx = tfidf_scores_all.argsort()[::-1][:100]
-        tfidf_ranked_ids = [corpus_ids[i] for i in tfidf_sorted_idx]
-        tfidf_score_map = {corpus_ids[i]: float(tfidf_scores_all[i]) for i in tfidf_sorted_idx}
-        
-        # 2. BM25
-        tokenized_query = processed_query.split()
-        bm25_scores_all = pipeline["bm25_model"].get_scores(tokenized_query)
-        bm25_sorted_idx = np.argsort(bm25_scores_all)[::-1][:100]
-        bm25_ranked_ids = [corpus_ids[i] for i in bm25_sorted_idx]
-        bm25_max = float(bm25_scores_all[bm25_sorted_idx[0]]) if bm25_scores_all[bm25_sorted_idx[0]] > 0 else 1.0
-        bm25_score_map = {corpus_ids[i]: float(bm25_scores_all[i]) / bm25_max for i in bm25_sorted_idx}
-        
-        # 3. Dense
-        query_dense = pipeline["dense_model"].encode([query], show_progress_bar=False)
-        dense_scores_all = cosine_similarity(query_dense, pipeline["dense_mat"]).flatten()
-        dense_sorted_idx = dense_scores_all.argsort()[::-1][:100]
-        dense_ranked_ids = [corpus_ids[i] for i in dense_sorted_idx]
-        dense_score_map = {corpus_ids[i]: float(dense_scores_all[i]) for i in dense_sorted_idx}
-        
-        # 4. RRF
-        rrf_ranked_ids = utils.reciprocal_rank_fusion([tfidf_ranked_ids, bm25_ranked_ids, dense_ranked_ids])[:100]
-        # RRF score: average of normalized scores from all models
-        rrf_score_map = {}
-        for doc_id in rrf_ranked_ids:
-            scores = [
-                tfidf_score_map.get(doc_id, 0),
-                bm25_score_map.get(doc_id, 0),
-                dense_score_map.get(doc_id, 0)
-            ]
-            rrf_score_map[doc_id] = float(np.mean(scores))
-        
-        elapsed = time.time() - start_time
-        st.success(f"Search completed in {elapsed:.2f} seconds.")
-        
-        col1, col2, col3, col4 = st.columns(4)
-        
-        def score_color(score):
-            """Return green for high scores, yellow for mid, red for low."""
-            if score >= 0.6:
-                return "🟢"
-            elif score >= 0.3:
-                return "🟡"
-            else:
-                return "🔴"
+    query = st.text_input(
+        "Enter a question to find duplicates:",
+        placeholder="e.g. How do I start investing in stocks?",
+    )
+    top_k = st.slider("Results per model", min_value=5, max_value=20, value=10, step=5)
 
-        def display_results(col, title, ranked_ids, score_map, top_k=10):
-            col.markdown(f"### {title}")
-            for rank, doc_id in enumerate(ranked_ids[:top_k]):
-                score = score_map.get(doc_id, 0.0)
-                emoji = score_color(score)
-                col.info(f"**{rank+1}.** {id_to_text[doc_id]}\n\n{emoji} Score: `{score:.3f}`")
-                
-        display_results(col1, "TF-IDF", tfidf_ranked_ids, tfidf_score_map)
-        display_results(col2, "BM25", bm25_ranked_ids, bm25_score_map)
-        display_results(col3, "Dense (Sentence-BERT)", dense_ranked_ids, dense_score_map)
-        display_results(col4, "Hybrid RRF", rrf_ranked_ids, rrf_score_map)
+    if st.button("Search", type="primary", disabled=not query.strip()):
+        if not query.strip():
+            st.warning("Please enter a question first.")
+        else:
+            t0 = time.time()
+            proc_q = utils.preprocess_text(query)
 
+            # TF-IDF
+            q_tfidf       = pipeline["tfidf_vec"].transform([proc_q])
+            tfidf_raw     = cosine_similarity(q_tfidf, pipeline["tfidf_mat"]).flatten()
+            tfidf_idx     = tfidf_raw.argsort()[::-1][:100]
+            tfidf_ids     = [corpus_ids[i] for i in tfidf_idx]
+            tfidf_smap    = {corpus_ids[i]: float(tfidf_raw[i]) for i in tfidf_idx}
+
+            # BM25
+            bm25_raw      = pipeline["bm25_model"].get_scores(proc_q.split())
+            bm25_idx      = np.argsort(bm25_raw)[::-1][:100]
+            bm25_ids      = [corpus_ids[i] for i in bm25_idx]
+            bm25_top      = float(bm25_raw[bm25_idx[0]]) if bm25_raw[bm25_idx[0]] > 0 else 1.0
+            bm25_smap     = {corpus_ids[i]: float(bm25_raw[i]) / bm25_top for i in bm25_idx}
+
+            # Dense
+            q_dense       = pipeline["dense_model"].encode([query], show_progress_bar=False)
+            dense_raw     = cosine_similarity(q_dense, pipeline["dense_mat"]).flatten()
+            dense_idx     = dense_raw.argsort()[::-1][:100]
+            dense_ids     = [corpus_ids[i] for i in dense_idx]
+            dense_smap    = {corpus_ids[i]: float(dense_raw[i]) for i in dense_idx}
+
+            # Hybrid RRF
+            rrf_ids       = utils.reciprocal_rank_fusion([tfidf_ids, bm25_ids, dense_ids])[:100]
+            rrf_smap      = {d: float(np.mean([tfidf_smap.get(d, 0),
+                                                bm25_smap.get(d, 0),
+                                                dense_smap.get(d, 0)])) for d in rrf_ids}
+
+            elapsed = time.time() - t0
+            st.success(f"Completed in **{elapsed:.2f}s**  ·  searching across **{len(corpus_ids):,}** unique questions")
+
+            def score_badge(score):
+                if score >= 0.6:   return "🟢"
+                elif score >= 0.3: return "🟡"
+                else:              return "🔴"
+
+            def render_col(col, title, ids, smap, k):
+                col.markdown(f"#### {title}")
+                col.divider()
+                for rank, doc_id in enumerate(ids[:k]):
+                    score = smap.get(doc_id, 0.0)
+                    col.markdown(
+                        f"**{rank+1}.** {id_to_text[doc_id]}  \n"
+                        f"{score_badge(score)} `{score:.3f}`"
+                    )
+                    col.divider()
+
+            c1, c2, c3, c4 = st.columns(4)
+            render_col(c1, "TF-IDF",            tfidf_ids, tfidf_smap, top_k)
+            render_col(c2, "BM25",              bm25_ids,  bm25_smap,  top_k)
+            render_col(c3, "Dense (SBERT)",     dense_ids, dense_smap, top_k)
+            render_col(c4, "Hybrid RRF",        rrf_ids,   rrf_smap,   top_k)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TAB 2 – EVALUATION
+# ═══════════════════════════════════════════════════════════════════════════════
 with tab2:
-    st.subheader("System Evaluation (Precision@10, Recall, MAP, nDCG)")
-    st.write("Evaluates the retrieval systems on queries that have known duplicates.")
-    
-    if st.button("Run Evaluation on Sample Queries"):
-        with st.spinner("Evaluating models... this may take a minute."):
-            valid_queries = [qid for qid, rel in pipeline["qrels"].items() if len(rel) > 0]
-            sample_queries = valid_queries[:50]
-            
-            results = {"TF-IDF": [], "BM25": [], "Dense": [], "Hybrid RRF": []}
-            # Store per-query precision at each recall level for PR curves
-            pr_data = {"TF-IDF": [], "BM25": [], "Dense": [], "Hybrid RRF": []}
-            
-            progress_bar = st.progress(0)
-            for idx, qid in enumerate(sample_queries):
-                q_text = id_to_text[qid]
-                proc_q = utils.preprocess_text(q_text)
-                relevant = pipeline["qrels"][qid]
-                
-                # TF-IDF
-                q_tfidf = pipeline["tfidf_vec"].transform([proc_q])
-                tfidf_scores = cosine_similarity(q_tfidf, pipeline["tfidf_mat"]).flatten()
-                tfidf_ranked = [corpus_ids[i] for i in tfidf_scores.argsort()[::-1][:100]]
-                
-                # BM25
-                bm25_scores = pipeline["bm25_model"].get_scores(proc_q.split())
-                bm25_ranked = [corpus_ids[i] for i in np.argsort(bm25_scores)[::-1][:100]]
-                
-                # Dense
-                q_dense = pipeline["dense_model"].encode([q_text], show_progress_bar=False)
-                dense_scores = cosine_similarity(q_dense, pipeline["dense_mat"]).flatten()
-                dense_ranked = [corpus_ids[i] for i in dense_scores.argsort()[::-1][:100]]
-                
-                # RRF
-                rrf_ranked = utils.reciprocal_rank_fusion([tfidf_ranked, bm25_ranked, dense_ranked])[:100]
-                
-                results["TF-IDF"].append(utils.calculate_metrics(tfidf_ranked, relevant))
-                results["BM25"].append(utils.calculate_metrics(bm25_ranked, relevant))
-                results["Dense"].append(utils.calculate_metrics(dense_ranked, relevant))
-                results["Hybrid RRF"].append(utils.calculate_metrics(rrf_ranked, relevant))
-                
-                # Collect precision-recall curve data per query
-                for model_name, ranked in [("TF-IDF", tfidf_ranked), ("BM25", bm25_ranked),
-                                            ("Dense", dense_ranked), ("Hybrid RRF", rrf_ranked)]:
-                    prec_pts, rec_pts = [], []
-                    hits = 0
-                    for k, doc_id in enumerate(ranked):
-                        if doc_id in relevant:
+    st.subheader("Evaluation")
+    st.write("Runs all 4 models over a sample of queries that have known duplicate labels and reports IR metrics.")
+
+    n_eval = st.slider("Number of evaluation queries", 20, 200, 50, step=10)
+
+    if st.button("Run Evaluation", type="primary"):
+        with st.spinner("Evaluating…"):
+            valid_qids   = [q for q, r in pipeline["qrels"].items() if r]
+            sample_qids  = valid_qids[:n_eval]
+
+            res    = {m: [] for m in ["TF-IDF", "BM25", "Dense", "Hybrid RRF"]}
+            pr_raw = {m: [] for m in ["TF-IDF", "BM25", "Dense", "Hybrid RRF"]}
+            bar    = st.progress(0)
+
+            for idx, qid in enumerate(sample_qids):
+                q_txt  = id_to_text[qid]
+                proc_q = utils.preprocess_text(q_txt)
+                rel    = pipeline["qrels"][qid]
+
+                q_tf   = pipeline["tfidf_vec"].transform([proc_q])
+                tf_s   = cosine_similarity(q_tf, pipeline["tfidf_mat"]).flatten()
+                tf_r   = [corpus_ids[i] for i in tf_s.argsort()[::-1][:100]]
+
+                bm_s   = pipeline["bm25_model"].get_scores(proc_q.split())
+                bm_r   = [corpus_ids[i] for i in np.argsort(bm_s)[::-1][:100]]
+
+                q_de   = pipeline["dense_model"].encode([q_txt], show_progress_bar=False)
+                de_s   = cosine_similarity(q_de, pipeline["dense_mat"]).flatten()
+                de_r   = [corpus_ids[i] for i in de_s.argsort()[::-1][:100]]
+
+                rr_r   = utils.reciprocal_rank_fusion([tf_r, bm_r, de_r])[:100]
+
+                for name, ranked in [("TF-IDF", tf_r), ("BM25", bm_r),
+                                     ("Dense", de_r), ("Hybrid RRF", rr_r)]:
+                    res[name].append(utils.calculate_metrics(ranked, rel))
+
+                    # PR curve data
+                    hits, prec_pts, rec_pts = 0, [], []
+                    for k, d in enumerate(ranked):
+                        if d in rel:
                             hits += 1
                         prec_pts.append(hits / (k + 1))
-                        rec_pts.append(hits / len(relevant) if relevant else 0)
-                    pr_data[model_name].append((rec_pts, prec_pts))
-                
-                progress_bar.progress((idx + 1) / len(sample_queries))
-                
-            # Summary table
-            summary = []
-            for model_name, metrics in results.items():
-                summary.append({
-                    "Model": model_name,
-                    "Precision@10": round(np.mean([m[0] for m in metrics]), 4),
-                    "Recall": round(np.mean([m[1] for m in metrics]), 4),
-                    "MAP": round(np.mean([m[2] for m in metrics]), 4),
-                    "nDCG": round(np.mean([m[3] for m in metrics]), 4)
-                })
-                
-            df_summary = pd.DataFrame(summary).set_index("Model")
-            st.dataframe(df_summary.style.highlight_max(axis=0, color='lightgreen'), use_container_width=True)
-            
-            # Bar chart
-            st.subheader("Performance Comparison")
-            fig1, ax1 = plt.subplots(figsize=(10, 5))
-            df_summary.plot(kind='bar', ax=ax1, width=0.75, colormap='Set2')
-            ax1.set_title("IR Models Performance Comparison")
-            ax1.set_ylabel("Score")
+                        rec_pts.append(hits / len(rel) if rel else 0)
+                    pr_raw[name].append((rec_pts, prec_pts))
+
+                bar.progress((idx + 1) / len(sample_qids))
+
+        # ── Summary table ────────────────────────────────────────────────────
+        summary = []
+        for name, metrics in res.items():
+            summary.append({
+                "Model":        name,
+                "Precision@10": round(np.mean([m[0] for m in metrics]), 4),
+                "Recall":       round(np.mean([m[1] for m in metrics]), 4),
+                "MAP":          round(np.mean([m[2] for m in metrics]), 4),
+                "nDCG":         round(np.mean([m[3] for m in metrics]), 4),
+            })
+        df = pd.DataFrame(summary).set_index("Model")
+        st.dataframe(df.style.highlight_max(axis=0, color="#d4edda"), use_container_width=True)
+
+        # ── Charts side-by-side ──────────────────────────────────────────────
+        col_a, col_b = st.columns(2)
+
+        with col_a:
+            st.markdown("**Performance Comparison**")
+            fig1, ax1 = plt.subplots(figsize=(6, 4))
+            df.plot(kind="bar", ax=ax1, width=0.7, colormap="tab10", legend=True)
             ax1.set_ylim(0, 1)
-            ax1.set_xticklabels(df_summary.index, rotation=20, ha='right')
-            ax1.legend(loc='upper right')
+            ax1.set_ylabel("Score")
+            ax1.set_xticklabels(df.index, rotation=20, ha="right")
+            ax1.legend(fontsize=8, loc="upper right")
+            ax1.grid(axis="y", alpha=0.3)
             plt.tight_layout()
             st.pyplot(fig1)
-            
-            # Precision-Recall Curves
-            st.subheader("Precision-Recall Curves")
-            fig2, ax2 = plt.subplots(figsize=(10, 6))
-            colors = {"TF-IDF": "#e74c3c", "BM25": "#3498db", "Dense": "#2ecc71", "Hybrid RRF": "#9b59b6"}
-            
-            recall_thresholds = np.linspace(0, 1, 50)
-            for model_name, query_prs in pr_data.items():
-                interp_precisions = []
-                for rec_pts, prec_pts in query_prs:
+
+        with col_b:
+            st.markdown("**Precision-Recall Curves**")
+            fig2, ax2 = plt.subplots(figsize=(6, 4))
+            colors = {"TF-IDF": "#e74c3c", "BM25": "#3498db",
+                      "Dense": "#27ae60", "Hybrid RRF": "#f39c12"}
+            recall_pts = np.linspace(0, 1, 50)
+
+            for name, qpr in pr_raw.items():
+                interps = []
+                for rec_pts, prec_pts in qpr:
                     if not rec_pts:
                         continue
-                    # Interpolate precision at fixed recall thresholds
-                    interp = []
-                    for r in recall_thresholds:
-                        above = [p for rec, p in zip(rec_pts, prec_pts) if rec >= r]
-                        interp.append(max(above) if above else 0.0)
-                    interp_precisions.append(interp)
-                
-                if interp_precisions:
-                    mean_prec = np.mean(interp_precisions, axis=0)
-                    ax2.plot(recall_thresholds, mean_prec, label=model_name, color=colors[model_name], linewidth=2.5)
-            
-            ax2.set_xlabel("Recall", fontsize=12)
-            ax2.set_ylabel("Precision", fontsize=12)
-            ax2.set_title("Precision-Recall Curves (averaged over 50 queries)", fontsize=13)
-            ax2.legend(fontsize=11)
-            ax2.set_xlim(0, 1)
-            ax2.set_ylim(0, 1)
-            ax2.grid(True, alpha=0.3)
+                    row = [max((p for r, p in zip(rec_pts, prec_pts) if r >= thr), default=0.0)
+                           for thr in recall_pts]
+                    interps.append(row)
+                if interps:
+                    ax2.plot(recall_pts, np.mean(interps, axis=0),
+                             label=name, color=colors[name], linewidth=2.2)
+
+            ax2.set_xlabel("Recall")
+            ax2.set_ylabel("Precision")
+            ax2.set_xlim(0, 1); ax2.set_ylim(0, 1)
+            ax2.legend(fontsize=8)
+            ax2.grid(alpha=0.3)
             plt.tight_layout()
             st.pyplot(fig2)
