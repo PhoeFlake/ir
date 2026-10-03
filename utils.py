@@ -44,14 +44,7 @@ def preprocess_text(text):
 
 def load_and_prepare_data(num_samples=10000):
     import pandas as pd
-    try:
-        df = pd.read_csv("questions.csv")
-        is_local = True
-    except FileNotFoundError:
-        from datasets import load_dataset
-        dataset = load_dataset("quora", split="train")
-        df = dataset.to_pandas()
-        is_local = False
+    df = pd.read_csv("questions.csv.zip")
         
     questions_dict = {}
     qrels = {}
@@ -61,22 +54,14 @@ def load_and_prepare_data(num_samples=10000):
         if count >= num_samples:
             break
             
-        if is_local:
-            try:
-                is_dup = int(row['is_duplicate']) if pd.notna(row['is_duplicate']) else 0
-                q1_id = int(row['qid1'])
-                q1_text = str(row['question1'])
-                q2_id = int(row['qid2'])
-                q2_text = str(row['question2'])
-            except Exception:
-                continue
-        else:
-            is_dup = int(row['is_duplicate'])
-            q_list = row['questions']
-            q1_id = int(q_list['id'][0])
-            q1_text = str(q_list['text'][0])
-            q2_id = int(q_list['id'][1])
-            q2_text = str(q_list['text'][1])
+        try:
+            is_dup = int(row['is_duplicate']) if pd.notna(row['is_duplicate']) else 0
+            q1_id = int(row['qid1'])
+            q1_text = str(row['question1'])
+            q2_id = int(row['qid2'])
+            q2_text = str(row['question2'])
+        except Exception:
+            continue
             
         questions_dict[q1_id] = q1_text
         questions_dict[q2_id] = q2_text
