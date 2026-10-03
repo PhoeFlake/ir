@@ -56,7 +56,7 @@ with tab1:
     st.subheader("Interactive Search")
     st.write("Find duplicate questions using 4 different ranking paradigms.")
     
-    query = st.text_input("Enter a question to find duplicates:", "How can I lose weight fast?")
+    query = st.text_input("Enter a question to find duplicates:", "top marvel movies")
     
     if st.button("Search"):
         start_time = time.time()
