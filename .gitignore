@@ -1,0 +1,6 @@
+venv/
+__pycache__/
+*.csv
+*.zip
+.DS_Store
+nltk_data/
