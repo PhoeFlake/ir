@@ -6,9 +6,9 @@ from sklearn.metrics.pairwise import cosine_similarity
 import utils
 import time
 
-st.set_page_config(layout="wide", page_title="Quora IR Project 8")
+st.set_page_config(layout="wide", page_title="Duplicate Question Retrieval")
 
-st.title("Project 8: Duplicate Question Retrieval")
+st.title("Duplicate Question Retrieval")
 st.markdown("Information Retrieval Pipeline with TF-IDF, BM25, Sentence Transformers, and Hybrid RRF.")
 
 @st.cache_resource
