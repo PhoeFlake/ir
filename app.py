@@ -23,8 +23,16 @@ def get_pipeline():
     import pickle
     import numpy as np
     from scipy import sparse
+    import os
     from sentence_transformers import SentenceTransformer
     
+    # Debug: Check if files are LFS pointers
+    import sys
+    size = os.path.getsize("indexes/dense_embeddings.npy")
+    if size < 1000:
+        st.error(f"Git LFS pointer detected! File size is {size} bytes.")
+        st.stop()
+        
     with open("indexes/corpus_metadata.pkl", "rb") as f:
         meta = pickle.load(f)
     corpus_ids = meta["corpus_ids"]
