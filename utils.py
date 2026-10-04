@@ -125,3 +125,38 @@ def calculate_metrics(retrieved, relevant, k=10):
     ndcg = dcg / idcg if idcg > 0 else 0.0
 
     return p_k, recall, ap, ndcg
+
+
+class FastBM25:
+    def __init__(self, meta_path, tf_path):
+        import pickle
+        from scipy import sparse
+        import numpy as np
+        with open(meta_path, "rb") as f:
+            meta = pickle.load(f)
+        self.vocabulary = meta["vocabulary"]
+        self.idf_array = meta["idf_array"]
+        self.doc_len = meta["doc_len"]
+        self.avgdl = meta["avgdl"]
+        self.tf_matrix = sparse.load_npz(tf_path)
+        self.k1 = 1.5
+        self.b = 0.75
+        self.doc_len_norm = self.doc_len / self.avgdl
+        
+    def get_scores(self, query_tokens):
+        import numpy as np
+        scores = np.zeros(len(self.doc_len), dtype=np.float32)
+        for term in query_tokens:
+            if term in self.vocabulary:
+                term_idx = self.vocabulary[term]
+                col = self.tf_matrix[:, term_idx]
+                doc_indices = col.indices
+                freqs = col.data
+                
+                idf = self.idf_array[term_idx]
+                
+                num = freqs * (self.k1 + 1)
+                den = freqs + self.k1 * (1 - self.b + self.b * self.doc_len_norm[doc_indices])
+                
+                scores[doc_indices] += idf * (num / den)
+        return scores
