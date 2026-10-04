@@ -6,7 +6,9 @@ import utils
 
 pipeline = st.session_state.pipeline
 corpus_ids = pipeline["corpus_ids"]
-id_to_text = pipeline["id_to_text"]
+db = st.session_state.db
+def get_text(qid):
+    return db.execute("SELECT text FROM questions WHERE qid=?", (int(qid),)).fetchone()[0]
 
 st.markdown("""
     <div style='text-align: center; margin-bottom: 2rem;'>
@@ -64,7 +66,7 @@ if search_clicked and query.strip():
         bm_score = bm25_smap.get(doc_id, 0.0)
         
         # Determine overlap
-        doc_tokens = set(utils.preprocess_text(id_to_text[doc_id]).split())
+        doc_tokens = set(utils.preprocess_text(get_text(doc_id)).split())
         query_tokens = set(proc_q.split())
         overlap = len(doc_tokens.intersection(query_tokens)) / max(len(query_tokens), 1)
 
@@ -74,7 +76,7 @@ if search_clicked and query.strip():
                     <span class='result-card-score'>{dense_score*100:.1f}% semantic similarity</span>
                     <span class='result-card-sub'>Rank #{rank+1}</span>
                 </div>
-                <div class='result-card-question'>{id_to_text[doc_id]}</div>
+                <div class='result-card-question'>{get_text(doc_id)}</div>
                 <div class='result-card-sub'>This question is semantically similar to your query.</div>
             </div>
         """, unsafe_allow_html=True)

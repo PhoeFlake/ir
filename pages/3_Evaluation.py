@@ -7,7 +7,17 @@ import utils
 
 pipeline = st.session_state.pipeline
 corpus_ids = pipeline["corpus_ids"]
-id_to_text = pipeline["id_to_text"]
+db = st.session_state.db
+def get_text(qid):
+    return db.execute("SELECT text FROM questions WHERE qid=?", (int(qid),)).fetchone()[0]
+
+@st.cache_data
+def load_qrels():
+    q = {}
+    for r in db.execute("SELECT qid, duplicate_id FROM qrels").fetchall():
+        q.setdefault(r[0], set()).add(r[1])
+    return q
+qrels = load_qrels()
 
 st.header("Model Evaluation")
 st.markdown("Academic evaluation of retrieval performance on queries with known duplicates.")
@@ -16,7 +26,7 @@ n_eval = st.slider("Number of evaluation queries", 20, 200, 50, step=10)
 
 if st.button("Run Evaluation", type="primary"):
     with st.spinner("Evaluating models..."):
-        valid_qids = [q for q, r in pipeline["qrels"].items() if r]
+        valid_qids = [q for q, r in qrels.items() if r]
         sample_qids = valid_qids[:n_eval]
 
         res = {m: [] for m in ["TF-IDF", "BM25", "Dense", "Hybrid RRF"]}
@@ -28,9 +38,9 @@ if st.button("Run Evaluation", type="primary"):
         bar = st.progress(0)
 
         for idx, qid in enumerate(sample_qids):
-            q_txt = id_to_text[qid]
+            q_txt = get_text(qid)
             proc_q = utils.preprocess_text(q_txt)
-            rel = pipeline["qrels"][qid]
+            rel = qrels[qid]
 
             q_tf = pipeline["tfidf_vec"].transform([proc_q])
             tf_s = cosine_similarity(q_tf, pipeline["tfidf_mat"]).flatten()
