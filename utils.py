@@ -40,14 +40,17 @@ def preprocess_text(text):
     cleaned_tokens = [stemmer.stem(token) for token in tokens if token not in stop_words]
     return " ".join(cleaned_tokens)
 
-def load_and_prepare_data():
-    """Load ALL rows from the local zipped CSV."""
+def load_and_prepare_data(num_samples=None):
+    """Load rows from the local zipped CSV."""
     df = pd.read_csv("questions.csv.zip")
 
     questions_dict = {}
     qrels = {}
+    count = 0
 
     for _, row in df.iterrows():
+        if num_samples is not None and count >= num_samples:
+            break
         try:
             is_dup = int(row['is_duplicate']) if pd.notna(row['is_duplicate']) else 0
             q1_id  = int(row['qid1'])
@@ -63,6 +66,8 @@ def load_and_prepare_data():
         if is_dup == 1:
             qrels.setdefault(q1_id, set()).add(q2_id)
             qrels.setdefault(q2_id, set()).add(q1_id)
+            
+        count += 1
 
     corpus_ids   = list(questions_dict.keys())
     corpus_texts = list(questions_dict.values())
