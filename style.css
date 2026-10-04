@@ -11,8 +11,14 @@
 
 html, body, [class*="css"] {
     font-family: 'Inter', sans-serif !important;
-    background-color: #F7F7F5 !important;
+    background-color: transparent !important;
     color: #171717 !important;
+}
+
+.stApp {
+    background-color: #F7F7F5;
+    background-image: radial-gradient(#D9D9D4 1px, transparent 1px);
+    background-size: 20px 20px;
 }
 
 /* Titles */
@@ -34,19 +40,35 @@ p, .stMarkdown p {
     color: #6B6B6B !important;
 }
 
+/* Search Bar Pill Design */
+.search-pill-container .stTextInput > div > div > input {
+    border-radius: 50px !important;
+    border: 1px solid #D9D9D4 !important;
+    padding: 0.75rem 1.5rem !important;
+    padding-left: 2.5rem !important;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.02) !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236B6B6B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='11' cy='11' r='8'%3E%3C/circle%3E%3Cline x1='21' y1='21' x2='16.65' y2='16.65'%3E%3C/line%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: 1rem center !important;
+    font-size: 1rem !important;
+}
+.search-pill-container .stTextInput > div > div > input:focus {
+    border-color: #B92B27 !important;
+    box-shadow: 0 0 0 1px #B92B27 !important;
+}
+
 /* Buttons */
 .stButton > button {
     background-color: #B92B27 !important;
     color: #FFFFFF !important;
     border: none !important;
-    border-radius: 4px !important;
+    border-radius: 50px !important;
     font-weight: 500 !important;
     padding: 0.5rem 1rem !important;
     transition: background-color 0.2s ease !important;
 }
 .stButton > button:hover {
     background-color: #9A2320 !important;
-    border: none !important;
 }
 .stButton > button[kind="secondary"] {
     background-color: transparent !important;
@@ -56,18 +78,6 @@ p, .stMarkdown p {
 .stButton > button[kind="secondary"]:hover {
     background-color: #EBEBE9 !important;
     border: 1px solid #171717 !important;
-}
-
-/* Inputs */
-.stTextInput > div > div > input {
-    background-color: #FFFFFF !important;
-    border: 1px solid #D9D9D4 !important;
-    border-radius: 4px !important;
-    color: #171717 !important;
-}
-.stTextInput > div > div > input:focus {
-    border-color: #B92B27 !important;
-    box-shadow: 0 0 0 1px #B92B27 !important;
 }
 
 /* Expanders */
@@ -100,6 +110,7 @@ hr {
     border-radius: 6px;
     padding: 1.25rem;
     margin-bottom: 1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.02);
 }
 .result-card-header {
     display: flex;
