@@ -1,0 +1,129 @@
+/* 
+  Restrained color system 
+  Background: #F7F7F5
+  Primary text: #171717
+  Secondary text: #6B6B6B
+  Borders: #D9D9D4
+  Accent: #B92B27 (Quora-ish red)
+*/
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Serif:wght@600&display=swap');
+
+html, body, [class*="css"] {
+    font-family: 'Inter', sans-serif !important;
+    background-color: #F7F7F5 !important;
+    color: #171717 !important;
+}
+
+/* Titles */
+h1 {
+    font-family: 'IBM Plex Serif', serif !important;
+    color: #171717 !important;
+    font-weight: 600 !important;
+}
+h2, h3, h4, h5, h6 {
+    font-family: 'Inter', sans-serif !important;
+    color: #171717 !important;
+}
+
+/* Secondary Text */
+p, .stMarkdown p {
+    color: #171717 !important;
+}
+.stCaption p, .secondary-text {
+    color: #6B6B6B !important;
+}
+
+/* Buttons */
+.stButton > button {
+    background-color: #B92B27 !important;
+    color: #FFFFFF !important;
+    border: none !important;
+    border-radius: 4px !important;
+    font-weight: 500 !important;
+    padding: 0.5rem 1rem !important;
+    transition: background-color 0.2s ease !important;
+}
+.stButton > button:hover {
+    background-color: #9A2320 !important;
+    border: none !important;
+}
+.stButton > button[kind="secondary"] {
+    background-color: transparent !important;
+    color: #171717 !important;
+    border: 1px solid #D9D9D4 !important;
+}
+.stButton > button[kind="secondary"]:hover {
+    background-color: #EBEBE9 !important;
+    border: 1px solid #171717 !important;
+}
+
+/* Inputs */
+.stTextInput > div > div > input {
+    background-color: #FFFFFF !important;
+    border: 1px solid #D9D9D4 !important;
+    border-radius: 4px !important;
+    color: #171717 !important;
+}
+.stTextInput > div > div > input:focus {
+    border-color: #B92B27 !important;
+    box-shadow: 0 0 0 1px #B92B27 !important;
+}
+
+/* Expanders */
+.stExpander {
+    border: 1px solid #D9D9D4 !important;
+    border-radius: 6px !important;
+    background-color: #FFFFFF !important;
+}
+.stExpander summary {
+    background-color: #FFFFFF !important;
+    color: #171717 !important;
+}
+
+/* Dataframes */
+.stDataFrame {
+    border: 1px solid #D9D9D4 !important;
+    border-radius: 6px !important;
+}
+
+/* Dividers */
+hr {
+    border-color: #D9D9D4 !important;
+    margin: 1.5rem 0 !important;
+}
+
+/* Result Cards */
+.result-card {
+    background-color: #FFFFFF;
+    border: 1px solid #D9D9D4;
+    border-radius: 6px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+}
+.result-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.75rem;
+}
+.result-card-score {
+    color: #B92B27;
+    font-weight: 600;
+    font-size: 0.875rem;
+}
+.result-card-question {
+    font-size: 1.125rem;
+    font-weight: 500;
+    color: #171717;
+    margin-bottom: 0.5rem;
+}
+.result-card-sub {
+    font-size: 0.875rem;
+    color: #6B6B6B;
+}
+
+/* Hide Streamlit Header */
+header[data-testid="stHeader"] {
+    background-color: transparent !important;
+}
