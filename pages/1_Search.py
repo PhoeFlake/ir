@@ -49,7 +49,13 @@ if search_clicked and query.strip():
     bm25_smap = {corpus_ids[i]: float(bm25_raw[i]) / bm25_top for i in bm25_idx}
 
     q_dense = pipeline["dense_model"].encode([query], show_progress_bar=False)
-    dense_raw = np.dot(q_dense, pipeline["dense_mat"].T).flatten()
+    
+    # CHUNKED DOT PRODUCT to avoid 2.1GB NumPy temporary array allocation
+    dense_raw = np.zeros(len(pipeline["dense_mat"]), dtype=np.float32)
+    chunk_size = 20000
+    for i in range(0, len(pipeline["dense_mat"]), chunk_size):
+        chunk = pipeline["dense_mat"][i:i+chunk_size]
+        dense_raw[i:i+chunk_size] = np.dot(q_dense, chunk.astype(np.float32).T).flatten()
     dense_idx = dense_raw.argsort()[::-1][:100]
     dense_ids = [corpus_ids[i] for i in dense_idx]
     dense_smap = {corpus_ids[i]: float(dense_raw[i]) for i in dense_idx}
