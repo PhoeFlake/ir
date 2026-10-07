@@ -37,7 +37,7 @@ if search_clicked and query.strip():
 
     # Retrieval
     q_tfidf = pipeline["tfidf_vec"].transform([proc_q])
-    tfidf_raw = cosine_similarity(q_tfidf, pipeline["tfidf_mat"]).flatten()
+    tfidf_raw = pipeline["tfidf_mat"].dot(q_tfidf.T).toarray().flatten()
     tfidf_idx = tfidf_raw.argsort()[::-1][:100]
     tfidf_ids = [corpus_ids[i] for i in tfidf_idx]
     tfidf_smap = {corpus_ids[i]: float(tfidf_raw[i]) for i in tfidf_idx}
