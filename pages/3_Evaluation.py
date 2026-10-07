@@ -50,7 +50,13 @@ if st.button("Run Evaluation", type="primary"):
             bm_r = [corpus_ids[i] for i in np.argsort(bm_s)[::-1][:100]]
 
             q_de = pipeline["dense_model"].encode([q_txt], show_progress_bar=False)
-            de_s = cosine_similarity(q_de, pipeline["dense_mat"]).flatten()
+            # CHUNKED DOT PRODUCT to avoid OOM
+            de_s = np.zeros(len(pipeline["dense_mat"]), dtype=np.float32)
+            chunk_size = 20000
+            for i in range(0, len(pipeline["dense_mat"]), chunk_size):
+                chunk = pipeline["dense_mat"][i:i+chunk_size]
+                de_s[i:i+chunk_size] = np.dot(q_de, chunk.astype(np.float32).T).flatten()
+            
             de_r = [corpus_ids[i] for i in de_s.argsort()[::-1][:100]]
 
             rr_r = utils.reciprocal_rank_fusion([tf_r, bm_r, de_r])[:100]
